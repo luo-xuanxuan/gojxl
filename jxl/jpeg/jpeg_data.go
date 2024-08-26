@@ -1,5 +1,10 @@
 package jxl
 
+import (
+	"gojxl/jxl"
+	"gojxl/jxl/base"
+)
+
 const (
 	kMaxComponents           int   = 4
 	kMaxQuantTables          int   = 4
@@ -44,8 +49,8 @@ var (
 	}
 )
 
-type jpegQuantizationTable struct {
-	values    [kDCTBlockSize]int32
+type JPEGQuantizationTable struct {
+	values    [jxl.DCTBlockSize]int32
 	precision uint32
 	// The index of this quantization table as it was parsed from the input JPEG.
 	// Each DQT marker segment contains an 'index' field, and we save this index
@@ -55,13 +60,13 @@ type jpegQuantizationTable struct {
 	isLast bool
 }
 
-func newJPEGQuantizationTable() jpegQuantizationTable {
-	return jpegQuantizationTable{
+func NewJPEGQuantizationTable() JPEGQuantizationTable {
+	return JPEGQuantizationTable{
 		isLast: true,
 	}
 }
 
-type jpegHuffmanCode struct {
+type JPEGHuffmanCode struct {
 	// Bit length histogram.
 	counts [kJpegHuffmanMaxBitLength + 1]uint32
 	// Symbol values sorted by increasing bit lengths.
@@ -73,20 +78,20 @@ type jpegHuffmanCode struct {
 	isLast bool
 }
 
-func newJPEGHuffmanCode() jpegHuffmanCode {
-	return jpegHuffmanCode{
+func NewJPEGHuffmanCode() JPEGHuffmanCode {
+	return JPEGHuffmanCode{
 		isLast: true,
 	}
 }
 
 // Huffman table indexes used for one component of one scan.
-type jpegComponentScanInfo struct {
+type JPEGComponentScanInfo struct {
 	componentIndex uint32
 	dcTableIndex   uint32
 	acTableIndex   uint32
 }
 
-type extraZeroRunInfo struct {
+type ExtraZeroRunInfo struct {
 	blockIndex       uint32
 	numExtraZeroRuns uint32
 }
@@ -103,7 +108,7 @@ type JPEGScanInfo struct {
 	Ah             uint32
 	Al             uint32
 	num_components uint32
-	components     [4]jpegComponentScanInfo
+	components     [4]JPEGComponentScanInfo
 	// Last codestream pass that is needed to write this scan.
 	lastNeededPass uint32
 
@@ -117,12 +122,12 @@ type JPEGScanInfo struct {
 	// block (if nonzero), indexed by block index.
 	// All of these symbols can be omitted without changing the pixel values, but
 	// some jpeg encoders put these at the end of blocks.
-	extraZeroRuns []extraZeroRunInfo
+	extraZeroRuns []ExtraZeroRunInfo
 }
 
 type coeff int16
 
-type jpegComponent struct {
+type JPEGComponent struct {
 	//four byte component id, might only need 1 byte?
 	id uint32
 	// Horizontal and vertical sampling factors.
@@ -140,8 +145,8 @@ type jpegComponent struct {
 	coeffs []coeff
 }
 
-func newJPEGComponent() jpegComponent {
-	return jpegComponent{
+func NewJPEGComponent() JPEGComponent {
+	return JPEGComponent{
 		hSampleFactor: 1,
 		vSampleFactor: 1,
 	}
@@ -163,9 +168,9 @@ type JPEGData struct {
 	appData         [][]uint8
 	appMarkerType   []AppMarkerType
 	componentData   [][]uint8
-	quantization    []jpegQuantizationTable
-	huffmanCode     []jpegHuffmanCode
-	components      []jpegComponent
+	quantization    []JPEGQuantizationTable
+	huffmanCode     []JPEGHuffmanCode
+	components      []JPEGComponent
 	scanInfo        []JPEGScanInfo
 	markerOrder     []uint8
 	interMarkerData [][]uint8
@@ -179,11 +184,11 @@ type JPEGData struct {
 func (data *JPEGData) CalculateMCUSize(scan *JPEGScanInfo, MCUsPerRow *int, MCURows *int) {}
 
 // TODO: implement VisitFields
-func (data *JPEGData) VisitFields(visitor *Visitor) Status {
-	return Status{}
+func (data *JPEGData) VisitFields(visitor *jxl.Visitor) base.Status {
+	return base.Status{}
 }
 
 // TODO: implement SetJPEGDataFromICC
-func SetJPEGDataFromICC(icc []uint8, jpegData *JPEGData) Status {
-	return Status{}
+func SetJPEGDataFromICC(icc []uint8, jpegData *JPEGData) base.Status {
+	return base.Status{}
 }
