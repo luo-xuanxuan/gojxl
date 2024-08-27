@@ -1,6 +1,7 @@
 package jxl
 
 import (
+	"fmt"
 	"gojxl/jxl"
 	"gojxl/jxl/base"
 )
@@ -103,12 +104,12 @@ type JPEGScanInfo struct {
 	//   Se : End of spectral band in zig-zag sequence.
 	//   Ah : Successive approximation bit position, high.
 	//   Al : Successive approximation bit position, low.
-	Ss             uint32
-	Se             uint32
-	Ah             uint32
-	Al             uint32
-	num_components uint32
-	components     [4]JPEGComponentScanInfo
+	Ss            uint32
+	Se            uint32
+	Ah            uint32
+	Al            uint32
+	numComponents uint32
+	components    [4]JPEGComponentScanInfo
 	// Last codestream pass that is needed to write this scan.
 	lastNeededPass uint32
 
@@ -133,8 +134,8 @@ type JPEGComponent struct {
 	// Horizontal and vertical sampling factors.
 	// In interleaved mode, each minimal coded unit (MCU) has
 	// hSampleFactor x vSampleFactor DCT blocks from this component.
-	hSampleFactor int64
-	vSampleFactor int64
+	hSampleFactor int
+	vSampleFactor int
 	// The index of the quantization table used for this component.
 	quantizationIndex uint32
 	// The dimensions of the component measured in 8x8 blocks.
@@ -180,15 +181,59 @@ type JPEGData struct {
 	paddingBits       []uint8
 }
 
-// TODO: implement CalculateMCUSize
-func (data *JPEGData) CalculateMCUSize(scan *JPEGScanInfo, MCUsPerRow *int, MCURows *int) {}
-
-// TODO: implement VisitFields
-func (data *JPEGData) VisitFields(visitor *jxl.Visitor) base.Status {
-	return base.Status{}
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
-// TODO: implement SetJPEGDataFromICC
-func SetJPEGDataFromICC(icc []uint8, jpegData *JPEGData) base.Status {
-	return base.Status{}
+// Mimics libjxl implementation, but we should be returning the values instead of modifying via pointers (maybe theres a perf dif?)
+func (data *JPEGData) CalculateMCUSize(scan JPEGScanInfo, MCUsPerRow *int, MCURows *int) {
+	isInterleaved := scan.numComponents > 1
+	baseComponent := &data.components[scan.components[0].componentIndex]
+
+	// hGroup / vGroup act as numerators for converting number of blocks to
+	// number of MCU. In interleaved mode it is 1, so MCU is represented with
+	// max*SampleFactor blocks. In non-interleaved mode we choose numerator to
+	// be the samping factor, consequently MCU is always represented with single
+	// block.
+	hGroup := baseComponent.hSampleFactor
+	vGroup := baseComponent.vSampleFactor
+	if isInterleaved {
+		hGroup = 1
+		vGroup = 1
+	}
+	maxHSampleFactor := 1
+	maxVSampleFactor := 1
+	for _, component := range data.components {
+		maxHSampleFactor = max(component.hSampleFactor, maxHSampleFactor)
+		maxVSampleFactor = max(component.vSampleFactor, maxVSampleFactor)
+	}
+	*MCUsPerRow = base.DivCeil(data.width*hGroup, 8*maxHSampleFactor)
+	*MCURows = base.DivCeil(data.height*vGroup, 8*maxVSampleFactor)
+}
+
+// TODO: implement VisitFields
+func (data *JPEGData) VisitFields(visitor *jxl.Visitor) error {
+	return nil
+}
+
+func SetJPEGDataFromICC(icc []uint8, jpegData *JPEGData) error {
+	var iccPos uint = 0
+	for i := range len(jpegData.appData) {
+		if jpegData.appMarkerType[i] != kICC {
+			continue
+		}
+		var length uint = uint(len(jpegData.appData[i])) - 17 //minus 17? idk its part of libjxl implementation
+		if iccPos+length > uint(len(icc)) {
+			return fmt.Errorf("ICC length is less than APP markers: requested %d more bytes, %d available", length, uint(len(icc))-iccPos)
+		}
+		copy(jpegData.appData[0][17:], icc[iccPos:iccPos+length]) //still dunno what 17 means
+		iccPos += length
+	}
+	if iccPos != uint(len(icc)) && iccPos != 0 {
+		return fmt.Errorf("ICC length is more then APP markers")
+	}
+	return nil
 }
